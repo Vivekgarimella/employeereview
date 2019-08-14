@@ -1,0 +1,87 @@
+---
+title: "EmployeeReview-Vivek"
+author: "SaiNagaChandraVivekGarimella"
+date: "August 14, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+
+
+
+read_data <- read_csv("C:/Users/garim/OneDrive/Desktop/NEU/Introduction to Data Management and Processing/Project/employee_reviews.csv/employee_reviews.csv" , guess_max = 1000 ,
+                  na = c("none", "n/a") )
+
+locations_df <- read.csv("file:///C:/Users/garim/OneDrive/Desktop/NEU/Introduction to Data Management and Processing/Project/locations_df.csv") %>% as.tibble()
+
+
+tidy_data <- read_data %>% full_join(locations_df) %>%
+            select(-X) %>%
+            separate(`job-title` , into=c("job-title","designation"), sep = "-")
+                  
+
+general_data<- read_data
+ 
+ general_data<-general_data %>% filter(`overall-ratings` !="none" & `culture-values-stars`!="none" & `work-balance-stars`!="none" &`carrer-opportunities-stars` !="none" &`comp-benefit-stars`!="none" & `senior-mangemnet-stars`!="none")
+ 
+ companynames <-general_data %>% group_by(company) %>% summarise(observations = n())
+company_overallrating <-general_data %>% group_by(`overall-ratings`,company) %>% summarise(rating = n())
+ 
+# overal rating proportions each company
+full_join(companynames,company_overallrating) %>% mutate(fine=rating/observations) %>% ggplot()+geom_bar(mapping = aes(x=company,y=fine,fill=as.factor( `overall-ratings`)),stat = "identity")
+
+company_workbalance<- general_data  %>% group_by(`work-balance-stars`,company) %>% summarise(total=n())
+
+
+full_join(company_workbalance,companynames) %>% mutate(workbalance= total/observations ) %>% ggplot()+geom_bar(mapping = aes(x=company,y=workbalance,fill=as.factor(`work-balance-stars`)),stat = "identity")
+
+
+general_data[["dates"]]<-mdy(general_data[["dates"]])
+general_data<-mutate(general_data,year=year(dates))
+
+general_data<-mutate(general_data,pos= str_sub(general_data[["job-title"]],1,16))
+general_data<-mutate(general_data,pos=str_trim(general_data[["pos"]]))
+
+
+company_position <-general_data %>% group_by(pos,company) %>% summarise(position=n())
+
+ full_join(company_position,companynames) %>% mutate(probability=position/observations) %>% ggplot()+geom_bar(mapping = aes(x=company,y=probability,fill=pos),stat = "identity")
+
+general_data
+
+positions<-general_data %>% group_by(pos) %>% summarise(totalpos=n())
+overall_pos<-general_data %>% group_by(pos,`overall-ratings`) %>% summarise(eachpos=n())
+
+full_join(positions,overall_pos) %>% mutate(prop=eachpos/totalpos) %>% ggplot()+geom_bar(mapping = aes(x=pos,y=prop,fill=as.factor(`overall-ratings`)),stat = "identity",position = "dodge")
+
+overall_ratings<-general_data %>% group_by(`overall-ratings`) %>% summarise(overall=n())
+overall_ratings_career<-general_data %>% group_by(`overall-ratings`,`carrer-opportunities-stars`) %>% summarise(overallcareer=n())
+
+full_join(overall_ratings,overall_ratings_career) %>% mutate(propo=overallcareer/overall) %>% ggplot()+geom_bar(mapping = aes(x=`overall-ratings`,y=propo,fill=`carrer-opportunities-stars`),stat="identity")
+
+
+average<- general_data %>% gather(`overall-ratings`,`work-balance-stars`,`culture-values-stars`,`carrer-opportunities-stars`,`comp-benefit-stars`,`senior-mangemnet-stars`,key="fields",value = "ratings") %>% group_by(company,fields,ratings) %>% summarise(totals=n())%>% mutate(prod=as.numeric(ratings)*totals) %>% group_by(company,fields) %>% summarise(totalsum=sum(prod))
+
+
+
+
+full_join(average,companynames) %>% group_by(company,fields) %>% mutate(totalratings=totalsum/observations) %>% ggplot()+geom_bar(mapping = aes(x=company,y=totalratings,fill=totalratings),stat = "identity") +facet_wrap(~fields)+coord_flip()
+
+average_pos<- general_data %>% gather(`overall-ratings`,`work-balance-stars`,`culture-values-stars`,`carrer-opportunities-stars`,`comp-benefit-stars`,`senior-mangemnet-stars`,key="fields",value = "ratings") %>% group_by(company,fields,ratings,pos) %>% summarise(posavg=n())%>% mutate(product=as.numeric(ratings)*posavg) %>% group_by(company,fields,pos) %>% summarise(numerator=sum(product))
+
+full_join(companynames,average_pos)  %>% mutate(totalratings=numerator/observations) %>% ggplot()+geom_bar(mapping = aes(x=company,y=totalratings,fill=pos),stat = "identity") +facet_wrap(~fields)+coord_flip()
+
+
+
+
+```
+
